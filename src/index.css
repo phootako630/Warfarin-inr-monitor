@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基础样式 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* 移动端安全区域适配 */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Toast 动画 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* 打印样式 */
+@media print {
+  /* 隐藏不需要打印的元素 */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 打印时的页面设置 */
+  @page {
+    margin: 1cm;
+    size: A4;
+  }
+
+  /* 确保打印时背景色正常显示 */
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* 避免表格和卡片被分页打断 */
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 调整打印时的字体大小 */
+  .print\:text-xs {
+    font-size: 0.75rem !important;
+  }
+
+  .print\:text-sm {
+    font-size: 0.875rem !important;
+  }
+
+  .print\:text-lg {
+    font-size: 1.125rem !important;
+  }
+
+  .print\:text-xl {
+    font-size: 1.25rem !important;
+  }
+
+  .print\:text-2xl {
+    font-size: 1.5rem !important;
+  }
+
+  /* 打印时的间距调整 */
+  .print\:p-3 {
+    padding: 0.75rem !important;
+  }
+
+  .print\:p-6 {
+    padding: 1.5rem !important;
+  }
+
+  .print\:px-2 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .print\:py-1 {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .print\:mb-6 {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .print\:mt-6 {
+    margin-top: 1.5rem !important;
+  }
+
+  .print\:pt-4 {
+    padding-top: 1rem !important;
+  }
+
+  .print\:text-\[10px\] {
+    font-size: 10px !important;
+  }
+
+  /* 确保链接和按钮在打印时不显示 */
+  a[href]:after {
+    content: none !important;
+  }
+}
+
+/* 表单输入框聚焦样式 */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+/* 禁用状态样式 */
+input:disabled,
+textarea:disabled,
+select:disabled,
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Scrollbar 样式（可选，美化滚动条） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 移动端输入框优化 */
+@media (max-width: 768px) {
+  input[type='date'],
+  input[type='datetime-local'],
+  input[type='time'] {
+    font-size: 16px; /* 防止 iOS Safari 自动缩放 */
+  }
+}
