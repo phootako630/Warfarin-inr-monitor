@@ -8,7 +8,7 @@ import { Card } from '../components/Card';
 
 export function DebugPage() {
   const navigate = useNavigate();
-  const [config, setConfig] = useState(getSupabaseConfig());
+  const [config] = useState(getSupabaseConfig());
   const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [testResult, setTestResult] = useState<string>('');
