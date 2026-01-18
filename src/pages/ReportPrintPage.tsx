@@ -57,8 +57,8 @@ export function ReportPrintPage() {
       const dateRange = getDateRange();
 
       const [inrData, bpData] = await Promise.all([
-        getInrRecords(dateRange),
-        getBloodPressureRecords(dateRange),
+        getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
+        getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       setInrRecords(inrData);

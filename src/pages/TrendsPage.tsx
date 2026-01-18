@@ -75,8 +75,8 @@ export function TrendsPage() {
       const dateRange = getDateRange();
 
       const [inrRecords, bpRecords] = await Promise.all([
-        getInrRecords(dateRange),
-        getBloodPressureRecords(dateRange),
+        getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
+        getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       // 聚合数据
