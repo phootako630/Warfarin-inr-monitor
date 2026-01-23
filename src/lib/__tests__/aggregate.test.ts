@@ -20,7 +20,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T08:00:00Z',
+        note: null,
       },
       {
         id: '2',
@@ -31,7 +31,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T18:00:00Z',
+        note: null,
       },
       {
         id: '3',
@@ -42,7 +42,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-21T10:00:00Z',
+        note: null,
       },
     ];
 
@@ -69,7 +69,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T10:00:00Z',
+        note: null,
       },
       {
         id: '2',
@@ -80,7 +80,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T14:00:00Z',
+        note: null,
       },
     ];
 
@@ -99,7 +99,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-22T10:00:00Z',
+        note: null,
       },
       {
         id: '2',
@@ -110,7 +110,7 @@ describe('aggregateInrByDay', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T10:00:00Z',
+        note: null,
       },
     ];
 
@@ -129,7 +129,7 @@ describe('aggregateBloodPressureByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        created_at: '2026-01-20T08:00:00Z',
+        position: null,
       },
       {
         id: '2',
@@ -138,7 +138,7 @@ describe('aggregateBloodPressureByDay', () => {
         diastolic: 85,
         heart_rate: 75,
         record_time: '2026-01-20T18:00:00Z',
-        created_at: '2026-01-20T18:00:00Z',
+        position: null,
       },
     ];
 
@@ -165,7 +165,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        created_at: '2026-01-20T08:00:00Z',
+        position: null,
       },
       {
         id: '2',
@@ -174,7 +174,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 85,
         heart_rate: 80,
         record_time: '2026-01-20T18:00:00Z',
-        created_at: '2026-01-20T18:00:00Z',
+        position: null,
       },
     ];
 
@@ -193,7 +193,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        created_at: '2026-01-20T08:00:00Z',
+        position: null,
       },
       {
         id: '2',
@@ -202,7 +202,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 85,
         heart_rate: null,
         record_time: '2026-01-20T18:00:00Z',
-        created_at: '2026-01-20T18:00:00Z',
+        position: null,
       },
     ];
 
@@ -221,7 +221,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: null,
         record_time: '2026-01-20T08:00:00Z',
-        created_at: '2026-01-20T08:00:00Z',
+        position: null,
       },
     ];
 
@@ -242,7 +242,7 @@ describe('calculateInrInRangeRate', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T10:00:00Z',
+        note: null,
       },
       {
         id: '2',
@@ -253,7 +253,7 @@ describe('calculateInrInRangeRate', () => {
         is_in_range: false,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-21T10:00:00Z',
+        note: null,
       },
       {
         id: '3',
@@ -264,7 +264,7 @@ describe('calculateInrInRangeRate', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-22T10:00:00Z',
+        note: null,
       },
       {
         id: '4',
@@ -275,7 +275,7 @@ describe('calculateInrInRangeRate', () => {
         is_in_range: false,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-23T10:00:00Z',
+        note: null,
       },
     ];
 
@@ -299,7 +299,7 @@ describe('calculateInrInRangeRate', () => {
         is_in_range: true,
         target_range_low: 2.0,
         target_range_high: 3.0,
-        created_at: '2026-01-20T10:00:00Z',
+        note: null,
       },
     ];
 
@@ -318,7 +318,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T10:00:00Z',
-        created_at: '2026-01-20T10:00:00Z',
+        position: null,
       },
       {
         id: '2',
@@ -327,7 +327,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 85,
         heart_rate: 80,
         record_time: '2026-01-21T10:00:00Z',
-        created_at: '2026-01-21T10:00:00Z',
+        position: null,
       },
     ];
 
@@ -348,7 +348,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T10:00:00Z',
-        created_at: '2026-01-20T10:00:00Z',
+        position: null,
       },
       {
         id: '2',
@@ -357,7 +357,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 85,
         heart_rate: null,
         record_time: '2026-01-21T10:00:00Z',
-        created_at: '2026-01-21T10:00:00Z',
+        position: null,
       },
     ];
 

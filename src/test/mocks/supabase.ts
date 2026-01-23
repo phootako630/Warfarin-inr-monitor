@@ -40,7 +40,6 @@ export const mockInrRecord = {
   target_range_low: 2.0,
   target_range_high: 3.0,
   note: '测试记录',
-  created_at: '2026-01-20T10:00:00Z',
 };
 
 export const mockBpRecord = {
@@ -51,7 +50,6 @@ export const mockBpRecord = {
   heart_rate: 70,
   position: '坐位',
   record_time: '2026-01-20T10:00:00Z',
-  created_at: '2026-01-20T10:00:00Z',
 };
 
 export const mockSession = {
