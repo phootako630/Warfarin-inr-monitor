@@ -14,6 +14,12 @@ import {
   deleteInrRecord,
   deleteBloodPressureRecord,
 } from '../lib/api';
+import {
+  checkInrRecordHealth,
+  checkBloodPressureRecordHealth,
+  getInrAbnormalColor,
+  getBloodPressureAbnormalColor,
+} from '../lib/healthCheck';
 import type {
   InrRecord,
   BloodPressureRecord,
@@ -264,8 +270,13 @@ function RecordCard({
 
   if (record.type === 'inr') {
     const data = record.data;
+    const healthCheck = checkInrRecordHealth(data);
+    const colorStyle = getInrAbnormalColor(data.value);
+
     return (
-      <Card className="relative">
+      <Card
+        className={`relative border-2 ${colorStyle.border} ${colorStyle.bg}`}
+      >
         <div className="absolute top-3 right-3 flex gap-2">
           <button
             onClick={() => onEdit(record)}
@@ -289,7 +300,7 @@ function RecordCard({
 
           <div className="space-y-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-gray-900">
+              <span className={`text-3xl font-bold ${colorStyle.text}`}>
                 {data.value}
               </span>
               {data.is_in_range !== null && (
@@ -304,6 +315,29 @@ function RecordCard({
                 </span>
               )}
             </div>
+
+            {/* 异常警告 */}
+            {healthCheck.hasAlert &&
+              healthCheck.messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`mt-2 p-3 rounded-lg ${
+                    healthCheck.level === 'danger'
+                      ? 'bg-red-100 border border-red-300'
+                      : 'bg-yellow-100 border border-yellow-300'
+                  }`}
+                >
+                  <p
+                    className={`text-sm font-medium ${
+                      healthCheck.level === 'danger'
+                        ? 'text-red-800'
+                        : 'text-yellow-800'
+                    }`}
+                  >
+                    {msg}
+                  </p>
+                </div>
+              ))}
 
             <p className="text-sm text-gray-600">{time}</p>
 
@@ -330,8 +364,13 @@ function RecordCard({
 
   // 血压记录
   const data = record.data;
+  const healthCheck = checkBloodPressureRecordHealth(data);
+  const colorStyle = getBloodPressureAbnormalColor(data.systolic, data.diastolic);
+
   return (
-    <Card className="relative">
+    <Card
+      className={`relative border-2 ${colorStyle.border} ${colorStyle.bg}`}
+    >
       <div className="absolute top-3 right-3 flex gap-2">
         <button
           onClick={() => onEdit(record)}
@@ -355,11 +394,34 @@ function RecordCard({
 
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-gray-900">
+            <span className={`text-3xl font-bold ${colorStyle.text}`}>
               {data.systolic}/{data.diastolic}
             </span>
             <span className="text-sm text-gray-600">mmHg</span>
           </div>
+
+          {/* 异常警告 */}
+          {healthCheck.hasAlert &&
+            healthCheck.messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`mt-2 p-3 rounded-lg ${
+                  healthCheck.level === 'danger'
+                    ? 'bg-red-100 border border-red-300'
+                    : 'bg-yellow-100 border border-yellow-300'
+                }`}
+              >
+                <p
+                  className={`text-sm font-medium ${
+                    healthCheck.level === 'danger'
+                      ? 'text-red-800'
+                      : 'text-yellow-800'
+                  }`}
+                >
+                  {msg}
+                </p>
+              </div>
+            ))}
 
           <p className="text-sm text-gray-600">{time}</p>
 

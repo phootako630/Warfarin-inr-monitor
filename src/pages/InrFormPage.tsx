@@ -6,6 +6,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { getCurrentUser } from '../lib/auth';
 import { createInrRecord, updateInrRecord } from '../lib/api';
+import { getInrAbnormalMessage, checkInrAbnormal } from '../lib/healthCheck';
 import type { InrRecord } from '../types';
 
 export function InrFormPage() {
@@ -29,6 +30,10 @@ export function InrFormPage() {
   const [note, setNote] = useState(existingRecord?.note || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [healthWarning, setHealthWarning] = useState<{
+    message: string;
+    level: 'warning' | 'danger';
+  } | null>(null);
 
   useEffect(() => {
     loadUserId();
@@ -46,6 +51,27 @@ export function InrFormPage() {
     } catch (error) {
       console.error('获取用户信息失败:', error);
       navigate('/login');
+    }
+  };
+
+  const handleValueChange = (newValue: string) => {
+    setValue(newValue);
+
+    // 检查异常值
+    const numValue = parseFloat(newValue);
+    if (!isNaN(numValue) && numValue > 0) {
+      const message = getInrAbnormalMessage(numValue);
+      if (message) {
+        const level = checkInrAbnormal(numValue);
+        setHealthWarning({
+          message,
+          level: level as 'warning' | 'danger',
+        });
+      } else {
+        setHealthWarning(null);
+      }
+    } else {
+      setHealthWarning(null);
     }
   };
 
@@ -133,12 +159,37 @@ export function InrFormPage() {
                 type="number"
                 step="0.1"
                 value={value}
-                onChange={(e) => setValue(e.target.value)}
+                onChange={(e) => handleValueChange(e.target.value)}
                 placeholder="例如: 2.5"
                 className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 disabled={loading}
                 required
               />
+
+              {/* 健康警告 */}
+              {healthWarning && (
+                <div
+                  className={`mt-3 p-4 rounded-lg border-2 ${
+                    healthWarning.level === 'danger'
+                      ? 'bg-red-50 border-red-300'
+                      : 'bg-yellow-50 border-yellow-300'
+                  }`}
+                >
+                  <p
+                    className={`text-base font-medium ${
+                      healthWarning.level === 'danger'
+                        ? 'text-red-800'
+                        : 'text-yellow-800'
+                    }`}
+                  >
+                    {healthWarning.message}
+                  </p>
+                </div>
+              )}
+
+              <p className="mt-2 text-sm text-gray-500">
+                💡 正常范围: 2.0 - 3.0
+              </p>
             </div>
 
             <div>

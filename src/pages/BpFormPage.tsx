@@ -6,6 +6,12 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { getCurrentUser } from '../lib/auth';
 import { createBloodPressureRecord, updateBloodPressureRecord } from '../lib/api';
+import {
+  getBloodPressureAbnormalMessage,
+  checkBloodPressureAbnormal,
+  getHeartRateAbnormalMessage,
+  checkHeartRateAbnormal,
+} from '../lib/healthCheck';
 import type { BloodPressureRecord } from '../types';
 import { POSITION_OPTIONS } from '../types';
 
@@ -37,6 +43,10 @@ export function BpFormPage() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [healthWarnings, setHealthWarnings] = useState<Array<{
+    message: string;
+    level: 'warning' | 'danger';
+  }>>([]);
 
   useEffect(() => {
     loadUserId();
@@ -55,6 +65,61 @@ export function BpFormPage() {
       console.error('获取用户信息失败:', error);
       navigate('/login');
     }
+  };
+
+  const checkHealthWarnings = (
+    sys: string,
+    dia: string,
+    hr: string
+  ) => {
+    const warnings: Array<{ message: string; level: 'warning' | 'danger' }> = [];
+
+    const sysValue = parseInt(sys);
+    const diaValue = parseInt(dia);
+
+    // 检查血压
+    if (!isNaN(sysValue) && !isNaN(diaValue) && sysValue > 0 && diaValue > 0) {
+      const bpMessage = getBloodPressureAbnormalMessage(sysValue, diaValue);
+      if (bpMessage) {
+        const bpLevel = checkBloodPressureAbnormal(sysValue, diaValue);
+        warnings.push({
+          message: bpMessage,
+          level: bpLevel as 'warning' | 'danger',
+        });
+      }
+    }
+
+    // 检查心率
+    if (hr.trim()) {
+      const hrValue = parseInt(hr);
+      if (!isNaN(hrValue) && hrValue > 0) {
+        const hrMessage = getHeartRateAbnormalMessage(hrValue);
+        if (hrMessage) {
+          const hrLevel = checkHeartRateAbnormal(hrValue);
+          warnings.push({
+            message: hrMessage,
+            level: hrLevel as 'warning' | 'danger',
+          });
+        }
+      }
+    }
+
+    setHealthWarnings(warnings);
+  };
+
+  const handleSystolicChange = (value: string) => {
+    setSystolic(value);
+    checkHealthWarnings(value, diastolic, heartRate);
+  };
+
+  const handleDiastolicChange = (value: string) => {
+    setDiastolic(value);
+    checkHealthWarnings(systolic, value, heartRate);
+  };
+
+  const handleHeartRateChange = (value: string) => {
+    setHeartRate(value);
+    checkHealthWarnings(systolic, diastolic, value);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -152,7 +217,7 @@ export function BpFormPage() {
                   id="systolic"
                   type="number"
                   value={systolic}
-                  onChange={(e) => setSystolic(e.target.value)}
+                  onChange={(e) => handleSystolicChange(e.target.value)}
                   placeholder="120"
                   className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   disabled={loading}
@@ -172,7 +237,7 @@ export function BpFormPage() {
                   id="diastolic"
                   type="number"
                   value={diastolic}
-                  onChange={(e) => setDiastolic(e.target.value)}
+                  onChange={(e) => handleDiastolicChange(e.target.value)}
                   placeholder="80"
                   className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   disabled={loading}
@@ -181,6 +246,36 @@ export function BpFormPage() {
                 <p className="text-xs text-gray-600 mt-1">低压</p>
               </div>
             </div>
+
+            {/* 健康警告 */}
+            {healthWarnings.length > 0 && (
+              <div className="space-y-2">
+                {healthWarnings.map((warning, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-lg border-2 ${
+                      warning.level === 'danger'
+                        ? 'bg-red-50 border-red-300'
+                        : 'bg-yellow-50 border-yellow-300'
+                    }`}
+                  >
+                    <p
+                      className={`text-base font-medium ${
+                        warning.level === 'danger'
+                          ? 'text-red-800'
+                          : 'text-yellow-800'
+                      }`}
+                    >
+                      {warning.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500">
+              💡 正常血压: 低于 130/85 mmHg
+            </p>
 
             <div>
               <label
@@ -193,12 +288,14 @@ export function BpFormPage() {
                 id="heartRate"
                 type="number"
                 value={heartRate}
-                onChange={(e) => setHeartRate(e.target.value)}
+                onChange={(e) => handleHeartRateChange(e.target.value)}
                 placeholder="例如: 72"
                 className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 disabled={loading}
               />
-              <p className="text-sm text-gray-600 mt-1">单位: bpm (次/分钟)</p>
+              <p className="text-sm text-gray-600 mt-1">
+                单位: bpm (次/分钟) · 正常: 60-100
+              </p>
             </div>
 
             <div>

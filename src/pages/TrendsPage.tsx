@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { subDays, startOfDay, endOfDay } from 'date-fns';
+import { subDays, startOfDay, endOfDay, format, parseISO } from 'date-fns';
 import {
   LineChart,
   Line,
@@ -27,7 +27,11 @@ import {
   calculateInrInRangeRate,
   calculateBloodPressureStats,
 } from '../lib/aggregate';
-import type { TimeRangePreset } from '../types';
+import {
+  checkInrRecordHealth,
+  checkBloodPressureRecordHealth,
+} from '../lib/healthCheck';
+import type { TimeRangePreset, InrRecord, BloodPressureRecord } from '../types';
 
 export function TrendsPage() {
   const navigate = useNavigate();
@@ -41,6 +45,8 @@ export function TrendsPage() {
   const [hrData, setHrData] = useState<any[]>([]);
   const [inrRate, setInrRate] = useState(0);
   const [bpStats, setBpStats] = useState<any>(null);
+  const [recentInrRecords, setRecentInrRecords] = useState<InrRecord[]>([]);
+  const [recentBpRecords, setRecentBpRecords] = useState<BloodPressureRecord[]>([]);
 
   useEffect(() => {
     loadTrends();
@@ -78,6 +84,10 @@ export function TrendsPage() {
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
+
+      // 保存原始记录用于异常检查
+      setRecentInrRecords(inrRecords);
+      setRecentBpRecords(bpRecords);
 
       // 聚合数据
       const inrAggregated = aggregateInrByDay(inrRecords);
@@ -164,6 +174,12 @@ export function TrendsPage() {
                 </Card>
               )}
             </div>
+
+            {/* 异常警告区域 */}
+            <HealthAlertsSection
+              inrRecords={recentInrRecords}
+              bpRecords={recentBpRecords}
+            />
 
             {/* INR 趋势图 */}
             {inrData.length > 0 && (
@@ -312,5 +328,106 @@ export function TrendsPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+/**
+ * 健康异常警告区域组件
+ */
+function HealthAlertsSection({
+  inrRecords,
+  bpRecords,
+}: {
+  inrRecords: InrRecord[];
+  bpRecords: BloodPressureRecord[];
+}) {
+  // 收集所有异常记录 (最多显示最近 5 条)
+  const alerts: Array<{
+    type: 'inr' | 'bp';
+    level: 'warning' | 'danger';
+    messages: string[];
+    time: string;
+  }> = [];
+
+  // 检查最近的 INR 记录
+  inrRecords.slice(0, 5).forEach((record) => {
+    const healthCheck = checkInrRecordHealth(record);
+    if (healthCheck.hasAlert) {
+      alerts.push({
+        type: 'inr',
+        level: healthCheck.level as 'warning' | 'danger',
+        messages: healthCheck.messages,
+        time: record.record_time,
+      });
+    }
+  });
+
+  // 检查最近的血压记录
+  bpRecords.slice(0, 5).forEach((record) => {
+    const healthCheck = checkBloodPressureRecordHealth(record);
+    if (healthCheck.hasAlert) {
+      alerts.push({
+        type: 'bp',
+        level: healthCheck.level as 'warning' | 'danger',
+        messages: healthCheck.messages,
+        time: record.record_time,
+      });
+    }
+  });
+
+  // 按时间排序 (最新的在前)
+  alerts.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+
+  // 只显示最近 3 条
+  const recentAlerts = alerts.slice(0, 3);
+
+  if (recentAlerts.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <span>⚠️</span>
+        <span>健康提醒</span>
+      </h2>
+
+      {recentAlerts.map((alert, idx) => (
+        <Card
+          key={idx}
+          className={`border-2 ${
+            alert.level === 'danger'
+              ? 'border-red-300 bg-red-50'
+              : 'border-yellow-300 bg-yellow-50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-2xl flex-shrink-0">
+              {alert.type === 'inr' ? '🩸' : '💓'}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700 mb-1">
+                {alert.type === 'inr' ? 'INR' : '血压'} -{' '}
+                {format(parseISO(alert.time), 'MM-dd HH:mm')}
+              </p>
+              {alert.messages.map((msg, msgIdx) => (
+                <p
+                  key={msgIdx}
+                  className={`text-base font-medium ${
+                    alert.level === 'danger' ? 'text-red-800' : 'text-yellow-800'
+                  }`}
+                >
+                  {msg}
+                </p>
+              ))}
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      <p className="text-xs text-gray-500 text-center">
+        💡 如有不适,请及时就医咨询
+      </p>
+    </div>
   );
 }
