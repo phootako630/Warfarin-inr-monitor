@@ -309,6 +309,34 @@ warfarin-inr-monitor/
 
 所有聚合逻辑在 `src/lib/aggregate.ts` 中，按"本地日"分组以避免 UTC 跨天问题。
 
+## 测试
+
+项目使用 **Vitest** 和 **React Testing Library** 进行测试。
+
+### 运行测试
+
+```bash
+# 运行测试（监听模式）
+npm test
+
+# 运行测试一次
+npm run test:run
+
+# 生成覆盖率报告
+npm run test:coverage
+
+# 使用 UI 界面
+npm run test:ui
+```
+
+### 测试文件位置
+
+- 工具函数测试：`src/lib/__tests__/`
+- 组件测试：`src/components/__tests__/`
+- 测试工具：`src/test/`
+
+详细的测试文档请参考 [TESTING.md](./TESTING.md)。
+
 ## 部署
 
 ### Vercel
