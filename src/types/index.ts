@@ -29,8 +29,57 @@ export interface Profile {
   phone: string | null;
 }
 
+// ============ 新增：剂量管理 ============
+
+// 医嘱处方记录（每次复诊后医生调整的剂量）
+export interface DoseRegime {
+  id: string;
+  user_id: string;
+  prescribed_dose: number;    // 0.5 / 1.0 / 1.125 / 1.25 / 1.5
+  start_date: string;         // yyyy-MM-dd
+  inr_record_id: string | null;
+  doctor_notes: string | null;
+  created_at: string;
+}
+
+// 每日服药记录
+export interface DoseLog {
+  id: string;
+  user_id: string;
+  date: string;               // yyyy-MM-dd
+  actual_dose: number | null; // 漏服时为 null
+  status: DoseStatus;
+  regime_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+// 服药状态
+export type DoseStatus = '已服用' | '漏服' | '剂量调整';
+
+// 服药统计
+export interface DoseAdherenceStats {
+  totalDays: number;
+  takenDays: number;
+  missedDays: number;
+  adjustedDays: number;
+  adherenceRate: number;      // 百分比 0-100
+  currentStreak: number;      // 连续服药天数
+}
+
+// 图表用：INR + 剂量合并数据点
+export interface DoseChartDataPoint {
+  date: string;
+  inr?: number;
+  dose?: number;
+  prescribedDose?: number;    // 当日处方剂量（参考线）
+  status?: DoseStatus;
+}
+
+// ============ 原有类型 ============
+
 // 记录类型（用于筛选）
-export type RecordType = 'all' | 'inr' | 'bp';
+export type RecordType = 'all' | 'inr' | 'bp' | 'dose';
 
 // 时间范围预设
 export type TimeRangePreset = '7d' | '30d' | '90d' | 'custom';
@@ -69,4 +118,13 @@ export const POSITION_OPTIONS = [
   { value: '卧位', label: '卧位' },
   { value: '站立', label: '站立' },
   { value: '其它', label: '其它' },
+] as const;
+
+// 剂量选项（片数 → 实际mg以3mg/片为基准换算显示）
+export const DOSE_OPTIONS = [
+  { value: 0.5,   label: '半片',       fraction: '1/2' },
+  { value: 1.0,   label: '1片',        fraction: '1' },
+  { value: 1.25,  label: '1又1/4片',   fraction: '1¼' },
+  { value: 1.5,   label: '1又半片',    fraction: '1½' },
+  { value: 1.125, label: '1又1/8片',   fraction: '1⅛' },
 ] as const;

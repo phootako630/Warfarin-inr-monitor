@@ -1,21 +1,24 @@
 # 健康记录应用 (华法林 INR 与血压监测)
 
-面向中国大陆长辈的健康记录 Web 应用，用于记录与查看 INR、血压、心率数据，并提供趋势分析与 PDF 报告导出。
+面向中国大陆长辈的健康记录 Web 应用，用于记录与查看 INR、血压、心率及**每日华法林服药**数据，并提供趋势分析与 PDF 报告导出。
 
 ## 特性
 
 - ✅ **完全本地化**: 无外部 CDN、无外链脚本、无 Google Fonts
 - ✅ **长辈友好**: 大字号、大按钮、简体中文、移动端优先
 - ✅ **数据安全**: 使用 Supabase，数据加密存储，RLS 行级安全
-- ✅ **趋势分析**: INR、血压、心率按天聚合折线图
-- ✅ **PDF 导出**: 一键打印健康报告，方便就医
+- ✅ **趋势分析**: INR、血压、心率、**剂量**按天聚合折线图
+- ✅ **剂量 vs INR 对比**: 在趋势图中同时展示服药剂量与 INR 变化
+- ✅ **每日服药记录**: 一键确认今日用药，支持 0.5/1/1.125/1.25/1.5 片选择
+- ✅ **医嘱处方管理**: 记录每次复诊医生调整的处方剂量，日常仅需一键确认
+- ✅ **PDF 导出**: 一键打印健康报告（含剂量数据），方便就医
 - ✅ **防白屏**: ErrorBoundary + 调试页面
 
 ## 技术栈
 
 - **前端框架**: React 18 + TypeScript
 - **构建工具**: Vite 5
-- **路由**: React Router v6
+- **路由**: React Router v6 (`HashRouter`)
 - **样式**: Tailwind CSS
 - **图表**: Recharts
 - **后端**: Supabase (PostgreSQL + RLS)
@@ -152,7 +155,67 @@ on blood_pressure_records for delete
 using (auth.uid()::text = user_id);
 ```
 
-#### 3. `profiles` 表（可选）
+#### 3. `dose_regimes` 表（医嘱处方）
+
+```sql
+create table dose_regimes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  prescribed_dose numeric not null,
+  start_date date not null default current_date,
+  inr_record_id uuid references inr_records(id),
+  doctor_notes text,
+  created_at timestamptz default now()
+);
+
+-- RLS 策略
+alter table dose_regimes enable row level security;
+
+create policy "用户查看自己的处方" on dose_regimes
+  for select using (auth.uid() = user_id);
+
+create policy "用户创建自己的处方" on dose_regimes
+  for insert with check (auth.uid() = user_id);
+
+create policy "用户更新自己的处方" on dose_regimes
+  for update using (auth.uid() = user_id);
+
+create policy "用户删除自己的处方" on dose_regimes
+  for delete using (auth.uid() = user_id);
+```
+
+#### 4. `dose_logs` 表（每日服药记录）
+
+```sql
+create table dose_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  date date not null default current_date,
+  actual_dose numeric,
+  status text not null default '已服用',
+  regime_id uuid references dose_regimes(id),
+  notes text,
+  created_at timestamptz default now(),
+  unique(user_id, date)
+);
+
+-- RLS 策略
+alter table dose_logs enable row level security;
+
+create policy "用户查看自己的服药记录" on dose_logs
+  for select using (auth.uid() = user_id);
+
+create policy "用户创建自己的服药记录" on dose_logs
+  for insert with check (auth.uid() = user_id);
+
+create policy "用户更新自己的服药记录" on dose_logs
+  for update using (auth.uid() = user_id);
+
+create policy "用户删除自己的服药记录" on dose_logs
+  for delete using (auth.uid() = user_id);
+```
+
+#### 5. `profiles` 表（可选）
 
 ```sql
 create table profiles (
@@ -188,34 +251,44 @@ Password: your-secure-password
 
 ### 2. 记录页面
 
-- 查看最近 30 天的 INR 和血压记录
-- 筛选：类型（全部/INR/血压）、时间范围（7/30/90 天或自定义）
-- 快速新增：点击顶部按钮新增 INR 或血压
+- 查看最近 30 天的 INR、血压和**服药**记录
+- 筛选：类型（全部/INR/血压/**服药**）、时间范围（7/30/90 天或自定义）
+- 快速新增：点击顶部按钮新增 INR、血压或**服药记录**
 - 编辑/删除：每条记录支持编辑和删除（删除需二次确认）
 
-### 3. 趋势页面
+### 3. 每日服药
+
+- **医嘱处方**: 每次复诊后录入医生开具的处方剂量，作为日常服药的参考基准
+- **一键确认**: 首页显示"今日服药"快捷卡片，点击即完成当日记录
+- **剂量选择**: 支持 0.5、1、1.125、1.25、1.5 片（华法林常见规格）
+- **状态标记**: 已服用 / 漏服 / 剂量调整
+- **设计理念**: 处方稳定期只需一键确认，降低长辈使用门槛
+
+### 4. 趋势页面
 
 - INR 折线图：显示目标区间（2-3），按天平均
 - 血压折线图：收缩压与舒张压，按天平均
 - 心率折线图：从血压记录中提取，按天平均
-- 统计卡片：INR 达标率、平均血压
+- **剂量趋势**: 每日实际服药剂量折线图，与 INR 对比查看
+- 统计卡片：INR 达标率、平均血压、**服药依从率**
 - 时间范围切换：7/30/90 天或自定义
 
-### 4. PDF 导出
+### 5. PDF 导出
 
 - 点击"导出 PDF"按钮
 - 选择时间范围
+- 报告包含 INR、血压及**服药剂量**数据
 - 点击"打印/保存 PDF"
 - 使用浏览器的打印功能保存为 PDF
 
-### 5. 设置页面
+### 6. 设置页面
 
 - 显示当前账号信息
 - 退出登录
 
-### 6. 调试页面
+### 7. 调试页面
 
-访问 `/debug` 可以：
+访问 `/#/debug` 可以：
 
 - 检查环境变量是否配置
 - 检查 Supabase 客户端是否初始化
@@ -226,21 +299,23 @@ Password: your-secure-password
 
 ### 1. 白屏或无法加载
 
-**原因**: 环境变量缺失
+**原因**: 环境变量缺失，或路由模式不兼容
 
 **解决**:
 1. 确认 `.env` 文件存在且包含正确的配置
-2. 重启开发服务器 (`npm run dev`)
-3. 访问 `/debug` 查看详细信息
+2. 确认使用 `HashRouter`（非 `BrowserRouter`），避免 iframe/代理环境下白屏
+3. 重启开发服务器 (`npm run dev`)
+4. 访问 `/#/debug` 查看详细信息
 
 ### 2. 登录后看不到数据
 
 **原因**: RLS 策略问题或 user_id 类型不匹配
 
 **解决**:
-1. 确认 `user_id` 字段类型为 `text`（不是 `uuid`）
-2. 确认 RLS 策略中使用 `auth.uid()::text = user_id`
-3. 在 `/debug` 页面测试查询，查看错误信息
+1. `inr_records` / `blood_pressure_records` 的 `user_id` 字段类型为 `text`
+2. `dose_regimes` / `dose_logs` 的 `user_id` 字段类型为 `uuid`（直接引用 `auth.users`）
+3. 确认 RLS 策略已正确配置
+4. 在 `/#/debug` 页面测试查询，查看错误信息
 
 ### 3. 401/403 错误
 
@@ -252,7 +327,7 @@ Password: your-secure-password
 **解决**:
 1. 检查 RLS 策略（见上方 SQL）
 2. 尝试退出登录后重新登录
-3. 访问 `/debug` 查看详细错误
+3. 访问 `/#/debug` 查看详细错误
 
 ### 4. 图表不显示
 
@@ -279,14 +354,19 @@ warfarin-inr-monitor/
 ├── src/
 │   ├── lib/              # 核心库（Supabase、认证、API、聚合）
 │   ├── components/       # 通用组件（按钮、卡片、导航等）
-│   ├── pages/            # 页面组件（登录、记录、趋势等）
+│   ├── pages/            # 页面组件（登录、记录、趋势、服药等）
+│   │   ├── RecordsPage.tsx
+│   │   ├── TrendsPage.tsx
+│   │   ├── DoseFormPage.tsx    ← 🆕 每日服药记录页
+│   │   ├── ReportPrintPage.tsx
+│   │   └── ...
 │   ├── types/            # TypeScript 类型定义
-│   ├── App.tsx           # 路由配置
+│   ├── App.tsx           # 路由配置（HashRouter）
 │   ├── main.tsx          # 入口文件
 │   └── index.css         # 全局样式
 ├── index.html            # HTML 入口
 ├── package.json          # 依赖配置
-├── vite.config.ts        # Vite 配置
+├── vite.config.ts        # Vite 配置（base: './'）
 ├── tailwind.config.js    # Tailwind 配置
 └── .env                  # 环境变量（需自行创建）
 ```
@@ -307,7 +387,24 @@ warfarin-inr-monitor/
 
 ### 数据聚合
 
-所有聚合逻辑在 `src/lib/aggregate.ts` 中，按"本地日"分组以避免 UTC 跨天问题。
+所有聚合逻辑在 `src/lib/aggregate.ts` 中，按"本地日"分组以避免 UTC 跨天问题。新增 `DoseChartDataPoint` 和 `DoseAdherenceStats` 类型支持剂量数据聚合。
+
+## 配置说明
+
+### Vite 配置 (`vite.config.ts`)
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `base` | `'./'` | 使用相对路径，兼容 iframe / 代理等非根路径部署 |
+| `server.host` | `'127.0.0.1'` | 仅监听本地，提升安全性 |
+| `server.strictPort` | `true` | 端口被占用时直接报错，避免静默换端口 |
+
+### TypeScript 配置 (`tsconfig.json`)
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `noUnusedLocals` | `false` | 允许未使用的局部变量（开发便利性） |
+| `noUnusedParameters` | `false` | 允许未使用的参数（开发便利性） |
 
 ## 测试
 
