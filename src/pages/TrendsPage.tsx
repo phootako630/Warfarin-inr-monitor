@@ -21,7 +21,7 @@ import { Card } from '../components/Card';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { DateRangeSelector } from '../components/DateRangeSelector';
-import { getInrRecords, getBloodPressureRecords, getDoseLogs, getDoseRegimes } from '../lib/api';
+import { getInrRecords, getBloodPressureRecords, getDoseLogs, getDoseRegimes, getWeightLogs } from '../lib/api';
 import {
   aggregateInrByDay,
   aggregateBloodPressureByDay,
@@ -30,6 +30,8 @@ import {
   calculateBloodPressureStats,
   calculateDoseAdherenceStats,
   buildDoseChartData,
+  aggregateWeightByDay,
+  calculateWeightStats,
 } from '../lib/aggregate';
 import {
   checkInrRecordHealth,
@@ -42,6 +44,7 @@ import type {
   DoseRegime,
   DoseAdherenceStats,
   DoseChartDataPoint,
+  WeightChartDataPoint,
 } from '../types';
 
 // 图表标签：简化日期
@@ -68,7 +71,11 @@ export function TrendsPage() {
   // 新增：剂量相关
   const [doseChartData, setDoseChartData]     = useState<DoseChartDataPoint[]>([]);
   const [adherenceStats, setAdherenceStats]   = useState<DoseAdherenceStats | null>(null);
-  const [activeTab, setActiveTab]             = useState<'inr' | 'bp' | 'dose'>('inr');
+  const [activeTab, setActiveTab]             = useState<'inr' | 'bp' | 'dose' | 'weight'>('inr');
+
+  // 新增：体重相关
+  const [weightChartData, setWeightChartData] = useState<WeightChartDataPoint[]>([]);
+  const [weightStats, setWeightStats]         = useState<any>(null);
 
   useEffect(() => { loadTrends(); }, [timeRange, customStart, customEnd]);
 
@@ -87,11 +94,12 @@ export function TrendsPage() {
     try {
       const dateRange = getDateRange();
 
-      const [inrRecords, bpRecords, doseLogs, regimes] = await Promise.all([
+      const [inrRecords, bpRecords, doseLogs, regimes, weightLogs] = await Promise.all([
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseLogs({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseRegimes(),
+        getWeightLogs({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       setRecentInrRecords(inrRecords);
@@ -114,6 +122,10 @@ export function TrendsPage() {
       const stats = calculateDoseAdherenceStats(doseLogs, dateRange.start, dateRange.end);
       setAdherenceStats(stats);
 
+      // 体重图表数据
+      setWeightChartData(aggregateWeightByDay(weightLogs));
+      setWeightStats(calculateWeightStats(weightLogs));
+
     } catch (error) {
       console.error('加载趋势失败:', error);
       alert('加载趋势失败，请重试');
@@ -122,7 +134,7 @@ export function TrendsPage() {
     }
   };
 
-  const hasData = inrData.length > 0 || bpData.length > 0 || hrData.length > 0 || doseChartData.length > 0;
+  const hasData = inrData.length > 0 || bpData.length > 0 || hrData.length > 0 || doseChartData.length > 0 || weightChartData.length > 0;
 
   // ─── 异常警告（原有逻辑）──────────────────────────────────
   const alerts: { type: 'inr' | 'bp'; level: string; messages: string[]; time: string }[] = [];
@@ -173,8 +185,8 @@ export function TrendsPage() {
           <>
             {/* ─── 标签页切换 ─── */}
             <div className="flex rounded-xl overflow-hidden border border-gray-200">
-              {(['inr', 'bp', 'dose'] as const).map((tab) => {
-                const labels = { inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药' };
+              {(['inr', 'bp', 'dose', 'weight'] as const).map((tab) => {
+                const labels = { inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药', weight: '⚖️ 体重' };
                 return (
                   <button
                     key={tab}
@@ -328,6 +340,85 @@ export function TrendsPage() {
                       <div className="bg-red-50 rounded-xl p-3 text-center">
                         <p className="text-3xl font-bold text-red-500">{adherenceStats.missedDays}</p>
                         <p className="text-xs text-gray-500 mt-1">❌ 漏服次数</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* ─── 体重趋势图表 ─── */}
+            {activeTab === 'weight' && (
+              <>
+                {weightChartData.length > 0 ? (
+                  <Card>
+                    <h2 className="text-lg font-semibold text-gray-800 mb-1">体重趋势</h2>
+                    <p className="text-xs text-gray-400 mb-3">☀️ 早晨　🌙 睡前</p>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <LineChart data={weightChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fontSize: 11 }} />
+                        <YAxis
+                          domain={['dataMin - 2', 'dataMax + 2']}
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${v}kg`}
+                        />
+                        <Tooltip
+                          formatter={(value: number, name: string) => [`${value} kg`, name]}
+                          labelFormatter={(l) => `日期: ${l}`}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="morning"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name="☀️ 早晨"
+                          connectNulls
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="evening"
+                          stroke="#6366f1"
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                          name="🌙 睡前"
+                          connectNulls
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Card>
+                ) : (
+                  <EmptyState icon="⚖️" title="暂无体重记录" description="开始记录体重后，这里将显示趋势图" />
+                )}
+
+                {/* 体重统计卡片 */}
+                {weightStats && weightStats.count > 0 && (
+                  <Card>
+                    <h2 className="text-lg font-semibold text-gray-800 mb-3">体重统计</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-purple-50 rounded-xl p-3 text-center">
+                        <p className="text-3xl font-bold text-purple-600">{weightStats.latest}</p>
+                        <p className="text-xs text-gray-500 mt-1">最近体重 (kg)</p>
+                      </div>
+                      <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <p className="text-3xl font-bold text-blue-600">{weightStats.avg}</p>
+                        <p className="text-xs text-gray-500 mt-1">平均体重 (kg)</p>
+                      </div>
+                      <div className="bg-green-50 rounded-xl p-3 text-center">
+                        <p className="text-3xl font-bold text-green-600">{weightStats.min} - {weightStats.max}</p>
+                        <p className="text-xs text-gray-500 mt-1">体重范围 (kg)</p>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center ${
+                        weightStats.change > 0 ? 'bg-red-50' : weightStats.change < 0 ? 'bg-green-50' : 'bg-gray-50'
+                      }`}>
+                        <p className={`text-3xl font-bold ${
+                          weightStats.change > 0 ? 'text-red-500' : weightStats.change < 0 ? 'text-green-500' : 'text-gray-600'
+                        }`}>
+                          {weightStats.change > 0 ? '+' : ''}{weightStats.change}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">期间变化 (kg)</p>
                       </div>
                     </div>
                   </Card>

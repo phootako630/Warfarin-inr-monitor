@@ -10,18 +10,21 @@ import {
   getBloodPressureRecords,
   getDoseLogs,
   getDoseRegimes,
+  getWeightLogs,
 } from '../lib/api';
 import {
   calculateInrInRangeRate,
   calculateBloodPressureStats,
   calculateDoseAdherenceStats,
+  calculateWeightStats,
 } from '../lib/aggregate';
-import { DOSE_OPTIONS } from '../types';
+import { DOSE_OPTIONS, TIME_OF_DAY_LABELS } from '../types';
 import type {
   InrRecord,
   BloodPressureRecord,
   DoseLog,
   DoseRegime,
+  WeightLog,
   DoseAdherenceStats,
   TimeRangePreset,
 } from '../types';
@@ -37,10 +40,12 @@ export function ReportPrintPage() {
   const [bpRecords, setBpRecords]     = useState<BloodPressureRecord[]>([]);
   const [doseLogs, setDoseLogs]       = useState<DoseLog[]>([]);
   const [regimes, setRegimes]         = useState<DoseRegime[]>([]);
+  const [weightLogs, setWeightLogs]   = useState<WeightLog[]>([]);
 
   const [inrRate, setInrRate]         = useState(0);
   const [bpStats, setBpStats]         = useState<any>(null);
   const [adherenceStats, setAdherenceStats] = useState<DoseAdherenceStats | null>(null);
+  const [wStats, setWStats] = useState<any>(null);
 
   useEffect(() => { loadData(); }, [timeRange, customStart, customEnd]);
 
@@ -58,21 +63,24 @@ export function ReportPrintPage() {
     setLoading(true);
     try {
       const dateRange = getDateRange();
-      const [inrData, bpData, doseData, regimeData] = await Promise.all([
+      const [inrData, bpData, doseData, regimeData, weightData] = await Promise.all([
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseLogs({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseRegimes(),
+        getWeightLogs({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       setInrRecords(inrData);
       setBpRecords(bpData);
       setDoseLogs(doseData);
       setRegimes(regimeData);
+      setWeightLogs(weightData);
 
       setInrRate(calculateInrInRangeRate(inrData));
       setBpStats(calculateBloodPressureStats(bpData));
       setAdherenceStats(calculateDoseAdherenceStats(doseData, dateRange.start, dateRange.end));
+      setWStats(calculateWeightStats(weightData));
     } catch (error) {
       console.error('加载数据失败:', error);
       alert('加载数据失败，请重试');
@@ -172,13 +180,11 @@ export function ReportPrintPage() {
               )}
             </div>
             <div className="border border-gray-200 rounded-lg p-4 print:p-3">
-              <p className="text-sm text-gray-600 mb-2 print:text-xs">漏服次数</p>
-              <p className="text-2xl font-bold text-gray-900 print:text-xl">
-                {adherenceStats?.missedDays ?? 0} 次
-              </p>
-              {(adherenceStats?.currentStreak ?? 0) > 0 && (
+              <p className="text-sm text-gray-600 mb-2 print:text-xs">体重记录数</p>
+              <p className="text-2xl font-bold text-gray-900 print:text-xl">{weightLogs.length} 条</p>
+              {wStats && wStats.count > 0 && (
                 <p className="text-sm text-gray-600 mt-2 print:text-xs">
-                  连续服药: {adherenceStats!.currentStreak} 天
+                  最近: {wStats.latest} kg · 变化: {wStats.change > 0 ? '+' : ''}{wStats.change} kg
                 </p>
               )}
             </div>
@@ -277,6 +283,7 @@ export function ReportPrintPage() {
                     <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">收缩压</th>
                     <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">舒张压</th>
                     <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">心率</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">手臂</th>
                     <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">体位</th>
                   </tr>
                 </thead>
@@ -289,9 +296,45 @@ export function ReportPrintPage() {
                       <td className="border border-gray-300 px-3 py-2 text-sm font-medium print:text-xs print:px-2 print:py-1">{record.systolic}</td>
                       <td className="border border-gray-300 px-3 py-2 text-sm font-medium print:text-xs print:px-2 print:py-1">{record.diastolic}</td>
                       <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{record.heart_rate || '—'}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{record.arm === 'left' ? '左手' : record.arm === 'right' ? '右手' : '—'}</td>
                       <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{record.position || '—'}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ─── 体重记录详情 ─── */}
+        {weightLogs.length > 0 && (
+          <div className="mb-8 print:mb-6 print:break-inside-avoid">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 print:text-lg">体重记录详情</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">日期</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">时段</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">体重 (kg)</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...weightLogs]
+                    .sort((a, b) => {
+                      const dateCmp = a.date.localeCompare(b.date);
+                      if (dateCmp !== 0) return dateCmp;
+                      return a.time_of_day.localeCompare(b.time_of_day);
+                    })
+                    .map((log) => (
+                      <tr key={log.id}>
+                        <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{log.date}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{TIME_OF_DAY_LABELS[log.time_of_day]}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm font-medium print:text-xs print:px-2 print:py-1">{log.weight_kg}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{log.notes || '—'}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>

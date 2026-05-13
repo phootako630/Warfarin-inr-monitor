@@ -16,7 +16,8 @@ import { TrendsPage } from './pages/TrendsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportPrintPage } from './pages/ReportPrintPage';
 import { DebugPage } from './pages/DebugPage';
-import { DoseFormPage } from './pages/DoseFormPage';   // 新增
+import { DoseFormPage } from './pages/DoseFormPage';
+import { WeightFormPage } from './pages/WeightFormPage';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { Loading } from './components/Loading';
 import type { ToastMessage } from './types';
@@ -75,6 +76,9 @@ export function App() {
 
           {/* 新增：服药记录路由 */}
           <Route path="/records/dose" element={<ProtectedRoute isAuthenticated={isAuthenticated}><DoseFormPage /></ProtectedRoute>} />
+
+          {/* 新增：体重记录路由 */}
+          <Route path="/records/weight" element={<ProtectedRoute isAuthenticated={isAuthenticated}><WeightFormPage /></ProtectedRoute>} />
 
           <Route path="/trends" element={<ProtectedRoute isAuthenticated={isAuthenticated}><TrendsPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated}><SettingsPage /></ProtectedRoute>} />

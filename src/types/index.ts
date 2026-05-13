@@ -11,6 +11,14 @@ export interface InrRecord {
   note: string | null;
 }
 
+// 测量手臂
+export type Arm = 'left' | 'right';
+
+export const ARM_LABELS: Record<Arm, string> = {
+  left: '左手',
+  right: '右手',
+};
+
 // 血压记录
 export interface BloodPressureRecord {
   id: string;
@@ -19,6 +27,7 @@ export interface BloodPressureRecord {
   diastolic: number;
   heart_rate: number | null;
   position: string | null;
+  arm: Arm | null;
   record_time: string;
 }
 
@@ -35,7 +44,7 @@ export interface Profile {
 export interface DoseRegime {
   id: string;
   user_id: string;
-  prescribed_dose: number;    // 0.5 / 1.0 / 1.125 / 1.25 / 1.5
+  prescribed_dose: number;    // 0.5 / 0.75 / 1.0 / 1.125 / 1.25 / 1.5
   start_date: string;         // yyyy-MM-dd
   inr_record_id: string | null;
   doctor_notes: string | null;
@@ -76,10 +85,35 @@ export interface DoseChartDataPoint {
   status?: DoseStatus;
 }
 
+// ============ 体重记录 ============
+
+export type TimeOfDay = 'morning' | 'evening';
+
+export interface WeightLog {
+  id: string;
+  user_id: string;
+  date: string;               // yyyy-MM-dd
+  time_of_day: TimeOfDay;
+  weight_kg: number;           // 如 65.5
+  notes: string | null;
+  created_at: string;
+}
+
+export interface WeightChartDataPoint {
+  date: string;
+  morning?: number;
+  evening?: number;
+}
+
+export const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
+  morning: '☀️ 早晨',
+  evening: '🌙 睡前',
+};
+
 // ============ 原有类型 ============
 
 // 记录类型（用于筛选）
-export type RecordType = 'all' | 'inr' | 'bp' | 'dose';
+export type RecordType = 'all' | 'inr' | 'bp' | 'dose' | 'weight';
 
 // 时间范围预设
 export type TimeRangePreset = '7d' | '30d' | '90d' | 'custom';
@@ -123,6 +157,7 @@ export const POSITION_OPTIONS = [
 // 剂量选项（片数 → 实际mg以3mg/片为基准换算显示）
 export const DOSE_OPTIONS = [
   { value: 0.5,   label: '半片',       fraction: '1/2' },
+  { value: 0.75,  label: '3/4片',      fraction: '3/4' },
   { value: 1.0,   label: '1片',        fraction: '1' },
   { value: 1.25,  label: '1又1/4片',   fraction: '1¼' },
   { value: 1.5,   label: '1又半片',    fraction: '1½' },

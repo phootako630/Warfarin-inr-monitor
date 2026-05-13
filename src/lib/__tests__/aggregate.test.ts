@@ -129,7 +129,7 @@ describe('aggregateBloodPressureByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
       {
         id: '2',
@@ -138,7 +138,7 @@ describe('aggregateBloodPressureByDay', () => {
         diastolic: 85,
         heart_rate: 75,
         record_time: '2026-01-20T18:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 
@@ -165,7 +165,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
       {
         id: '2',
@@ -174,7 +174,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 85,
         heart_rate: 80,
         record_time: '2026-01-20T18:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 
@@ -193,7 +193,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T08:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
       {
         id: '2',
@@ -202,7 +202,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 85,
         heart_rate: null,
         record_time: '2026-01-20T18:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 
@@ -221,7 +221,7 @@ describe('aggregateHeartRateByDay', () => {
         diastolic: 80,
         heart_rate: null,
         record_time: '2026-01-20T08:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 
@@ -318,7 +318,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T10:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
       {
         id: '2',
@@ -327,7 +327,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 85,
         heart_rate: 80,
         record_time: '2026-01-21T10:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 
@@ -348,7 +348,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 80,
         heart_rate: 70,
         record_time: '2026-01-20T10:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
       {
         id: '2',
@@ -357,7 +357,7 @@ describe('calculateBloodPressureStats', () => {
         diastolic: 85,
         heart_rate: null,
         record_time: '2026-01-21T10:00:00Z',
-        position: null,
+        position: null, arm: null,
       },
     ];
 

@@ -12,8 +12,8 @@ import {
   getHeartRateAbnormalMessage,
   checkHeartRateAbnormal,
 } from '../lib/healthCheck';
-import type { BloodPressureRecord } from '../types';
-import { POSITION_OPTIONS } from '../types';
+import type { BloodPressureRecord, Arm } from '../types';
+import { POSITION_OPTIONS, ARM_LABELS } from '../types';
 
 export function BpFormPage() {
   const navigate = useNavigate();
@@ -36,6 +36,7 @@ export function BpFormPage() {
     existingRecord?.heart_rate?.toString() || ''
   );
   const [position, setPosition] = useState(existingRecord?.position || '');
+  const [arm, setArm] = useState<Arm | ''>(existingRecord?.arm || '');
   const [recordTime, setRecordTime] = useState(
     existingRecord
       ? format(new Date(existingRecord.record_time), "yyyy-MM-dd'T'HH:mm")
@@ -173,6 +174,7 @@ export function BpFormPage() {
         diastolic: diastolicValue,
         heart_rate: heartRateValue,
         position: position.trim() || null,
+        arm: arm || null,
         record_time: new Date(recordTime).toISOString(),
       };
 
@@ -296,6 +298,29 @@ export function BpFormPage() {
               <p className="text-sm text-gray-600 mt-1">
                 单位: bpm (次/分钟) · 正常: 60-100
               </p>
+            </div>
+
+            <div>
+              <label className="block text-base font-medium text-gray-700 mb-2">
+                测量手臂 (可选)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['left', 'right'] as Arm[]).map((side) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setArm(arm === side ? '' : side)}
+                    disabled={loading}
+                    className={`px-4 py-3 text-base font-medium rounded-xl border-2 transition-colors ${
+                      arm === side
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {side === 'left' ? '🤚' : '✋'} {ARM_LABELS[side]}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

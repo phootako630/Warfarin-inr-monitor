@@ -6,6 +6,8 @@ import type {
   DoseRegime,
   DoseLog,
   DoseStatus,
+  WeightLog,
+  TimeOfDay,
 } from '../types';
 
 // ============ INR 记录 ============
@@ -322,4 +324,149 @@ export async function upsertTodayDoseLog(
       notes: notes ?? null,
     });
   }
+}
+
+// ============ 体重记录 (weight_logs) ============
+
+/**
+ * 获取体重记录列表
+ */
+export async function getWeightLogs(params: {
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+} = {}): Promise<WeightLog[]> {
+  let query = supabase
+    .from('weight_logs')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (params.startDate) query = query.gte('date', params.startDate.toISOString().split('T')[0]);
+  if (params.endDate)   query = query.lte('date', params.endDate.toISOString().split('T')[0]);
+  if (params.limit)     query = query.limit(params.limit);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`获取体重记录失败: ${error.message}`);
+  return data || [];
+}
+
+/**
+ * 获取某天某时段的体重记录
+ */
+export async function getWeightLogByDateAndTime(
+  date: string,
+  timeOfDay: TimeOfDay
+): Promise<WeightLog | null> {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .eq('date', date)
+    .eq('time_of_day', timeOfDay)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw new Error(`获取体重记录失败: ${error.message}`);
+  }
+  return data;
+}
+
+/**
+ * 获取某天的所有体重记录（早晚）
+ */
+export async function getWeightLogsByDate(date: string): Promise<WeightLog[]> {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .eq('date', date)
+    .order('time_of_day', { ascending: true });
+
+  if (error) throw new Error(`获取体重记录失败: ${error.message}`);
+  return data || [];
+}
+
+/**
+ * 创建体重记录
+ */
+export async function createWeightLog(
+  log: Omit<WeightLog, 'id' | 'created_at'>
+): Promise<WeightLog> {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .insert(log)
+    .select()
+    .single();
+  if (error) throw new Error(`创建体重记录失败: ${error.message}`);
+  return data;
+}
+
+/**
+ * 更新体重记录
+ */
+export async function updateWeightLog(
+  id: string,
+  updates: Partial<Omit<WeightLog, 'id' | 'user_id' | 'created_at'>>
+): Promise<WeightLog> {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw new Error(`更新体重记录失败: ${error.message}`);
+  return data;
+}
+
+/**
+ * 删除体重记录
+ */
+export async function deleteWeightLog(id: string): Promise<void> {
+  const { error } = await supabase.from('weight_logs').delete().eq('id', id);
+  if (error) throw new Error(`删除体重记录失败: ${error.message}`);
+}
+
+/**
+ * 便捷方法：upsert 某日某时段的体重
+ */
+export async function upsertWeightLog(
+  userId: string,
+  date: string,
+  timeOfDay: TimeOfDay,
+  weightKg: number,
+  notes?: string
+): Promise<WeightLog> {
+  const existing = await getWeightLogByDateAndTime(date, timeOfDay);
+  if (existing) {
+    return updateWeightLog(existing.id, {
+      weight_kg: weightKg,
+      notes: notes ?? existing.notes,
+    });
+  } else {
+    return createWeightLog({
+      user_id: userId,
+      date,
+      time_of_day: timeOfDay,
+      weight_kg: weightKg,
+      notes: notes ?? null,
+    });
+  }
+}
+
+/**
+ * 获取最近一次体重记录（用于默认值）
+ */
+export async function getLatestWeightLog(): Promise<WeightLog | null> {
+  const { data, error } = await supabase
+    .from('weight_logs')
+    .select('*')
+    .order('date', { ascending: false })
+    .order('time_of_day', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw new Error(`获取最近体重失败: ${error.message}`);
+  }
+  return data;
 }

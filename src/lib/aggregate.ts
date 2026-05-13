@@ -7,6 +7,8 @@ import type {
   DoseRegime,
   DoseAdherenceStats,
   DoseChartDataPoint,
+  WeightLog,
+  WeightChartDataPoint,
 } from '../types';
 
 // ============ 工具函数 ============
@@ -232,4 +234,55 @@ export function buildDoseChartData(
   });
 
   return result;
+}
+
+// ============ 体重聚合 ============
+
+/**
+ * 按天聚合体重记录，早晚分列
+ */
+export function aggregateWeightByDay(logs: WeightLog[]): WeightChartDataPoint[] {
+  const grouped = new Map<string, { morning?: number; evening?: number }>();
+
+  logs.forEach((log) => {
+    if (!grouped.has(log.date)) grouped.set(log.date, {});
+    const entry = grouped.get(log.date)!;
+    if (log.time_of_day === 'morning') entry.morning = log.weight_kg;
+    if (log.time_of_day === 'evening') entry.evening = log.weight_kg;
+  });
+
+  const result: WeightChartDataPoint[] = [];
+  grouped.forEach((values, date) => {
+    result.push({ date, ...values });
+  });
+
+  return result.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * 计算体重统计
+ */
+export function calculateWeightStats(logs: WeightLog[]) {
+  if (logs.length === 0) {
+    return { count: 0, latest: null, min: null, max: null, avg: null, change: null };
+  }
+
+  const weights = logs.map((l) => l.weight_kg);
+  const sorted = [...logs].sort((a, b) => {
+    const dateCmp = a.date.localeCompare(b.date);
+    if (dateCmp !== 0) return dateCmp;
+    return a.time_of_day.localeCompare(b.time_of_day);
+  });
+
+  const latest = sorted[sorted.length - 1].weight_kg;
+  const earliest = sorted[0].weight_kg;
+
+  return {
+    count: logs.length,
+    latest,
+    min: Math.min(...weights),
+    max: Math.max(...weights),
+    avg: Math.round((weights.reduce((s, w) => s + w, 0) / weights.length) * 10) / 10,
+    change: Math.round((latest - earliest) * 10) / 10,
+  };
 }
