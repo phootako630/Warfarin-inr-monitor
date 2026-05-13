@@ -110,10 +110,84 @@ export const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {
   evening: '🌙 睡前',
 };
 
+// ============ 饮食记录 ============
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type VkLevel = 'high' | 'medium' | 'low';
+export type Portion = 'small' | 'normal' | 'large';
+export type FoodCategory = 'vegetable' | 'meat' | 'fruit' | 'staple' | 'other';
+
+export const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  breakfast: '🌅 早餐',
+  lunch: '☀️ 午餐',
+  dinner: '🌙 晚餐',
+  snack: '🍪 加餐',
+};
+
+export const VK_LEVEL_LABELS: Record<VkLevel, string> = {
+  high: '🔴 高',
+  medium: '🟡 中',
+  low: '🟢 低',
+};
+
+export const PORTION_LABELS: Record<Portion, string> = {
+  small: '少量',
+  normal: '正常',
+  large: '多',
+};
+
+export const FOOD_CATEGORY_LABELS: Record<FoodCategory, string> = {
+  vegetable: '🥬 蔬菜',
+  meat: '🥩 肉蛋',
+  fruit: '🍎 水果',
+  staple: '🍚 主食',
+  other: '🥤 其他',
+};
+
+export interface FoodItem {
+  id: string;
+  name: string;
+  icon: string;
+  category: FoodCategory;
+  vk_level: VkLevel;
+  vk_mcg_per_100g?: number;
+}
+
+export interface MealLog {
+  id: string;
+  user_id: string;
+  date: string;
+  meal_type: MealType;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface MealLogItem {
+  id: string;
+  meal_log_id: string;
+  food_id: string;
+  custom_name: string | null;
+  vk_level: VkLevel;
+  portion: Portion;
+  created_at: string;
+}
+
+export interface MealLogWithItems extends MealLog {
+  items: MealLogItem[];
+}
+
+export interface DailyVkSummary {
+  date: string;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  level: VkLevel;  // overall daily level
+}
+
 // ============ 原有类型 ============
 
 // 记录类型（用于筛选）
-export type RecordType = 'all' | 'inr' | 'bp' | 'dose' | 'weight';
+export type RecordType = 'all' | 'inr' | 'bp' | 'dose' | 'weight' | 'meal';
 
 // 时间范围预设
 export type TimeRangePreset = '7d' | '30d' | '90d' | 'custom';

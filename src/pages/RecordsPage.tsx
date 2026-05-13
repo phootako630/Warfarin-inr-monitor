@@ -15,24 +15,29 @@ import {
   getActiveRegime,
   getWeightLogs,
   getWeightLogsByDate,
+  getMealLogsByDate,
+  getMealLogs,
   deleteInrRecord,
   deleteBloodPressureRecord,
   deleteDoseLog,
   deleteWeightLog,
+  deleteMealLog,
 } from '../lib/api';
+import { getFoodById } from '../lib/foodData';
 import {
   checkInrRecordHealth,
   checkBloodPressureRecordHealth,
   getInrAbnormalColor,
   getBloodPressureAbnormalColor,
 } from '../lib/healthCheck';
-import { DOSE_OPTIONS, TIME_OF_DAY_LABELS } from '../types';
+import { DOSE_OPTIONS, TIME_OF_DAY_LABELS, MEAL_TYPE_LABELS, PORTION_LABELS } from '../types';
 import type {
   InrRecord,
   BloodPressureRecord,
   DoseLog,
   DoseRegime,
   WeightLog,
+  MealLogWithItems,
   RecordType,
   TimeRangePreset,
 } from '../types';
@@ -41,7 +46,8 @@ type CombinedRecord =
   | { type: 'inr';  data: InrRecord }
   | { type: 'bp';   data: BloodPressureRecord }
   | { type: 'dose'; data: DoseLog }
-  | { type: 'weight'; data: WeightLog };
+  | { type: 'weight'; data: WeightLog }
+  | { type: 'meal'; data: MealLogWithItems };
 
 export function RecordsPage() {
   const navigate = useNavigate();
@@ -61,12 +67,15 @@ export function RecordsPage() {
   const [activeRegime, setActiveRegime]     = useState<DoseRegime | null>(null);
   // 今日体重
   const [todayWeightLogs, setTodayWeightLogs] = useState<WeightLog[]>([]);
+  // 今日饮食
+  const [todayMeals, setTodayMeals] = useState<MealLogWithItems[]>([]);
   const today = format(new Date(), 'yyyy-MM-dd');
 
   useEffect(() => {
     loadRecords();
     loadTodayDose();
     loadTodayWeight();
+    loadTodayMeals();
   }, [timeRange, customStart, customEnd]);
 
   const getDateRange = () => {
@@ -104,15 +113,25 @@ export function RecordsPage() {
     }
   };
 
+  const loadTodayMeals = async () => {
+    try {
+      const meals = await getMealLogsByDate(today);
+      setTodayMeals(meals);
+    } catch (err) {
+      console.error('加载今日饮食失败:', err);
+    }
+  };
+
   const loadRecords = async () => {
     setLoading(true);
     try {
       const dateRange = getDateRange();
-      const [inrData, bpData, doseData, weightData] = await Promise.all([
+      const [inrData, bpData, doseData, weightData, mealData] = await Promise.all([
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseLogs({ startDate: dateRange.start, endDate: dateRange.end }),
         getWeightLogs({ startDate: dateRange.start, endDate: dateRange.end }),
+        getMealLogs({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       const combined: CombinedRecord[] = [
@@ -120,12 +139,13 @@ export function RecordsPage() {
         ...bpData.map((r) => ({ type: 'bp' as const, data: r })),
         ...doseData.map((r) => ({ type: 'dose' as const, data: r })),
         ...weightData.map((r) => ({ type: 'weight' as const, data: r })),
+        ...mealData.map((r) => ({ type: 'meal' as const, data: r })),
       ];
 
       // 按时间倒序排序
       combined.sort((a, b) => {
         const getTime = (r: CombinedRecord) =>
-          r.type === 'dose' || r.type === 'weight'
+          r.type === 'dose' || r.type === 'weight' || r.type === 'meal'
             ? new Date(r.data.date + 'T00:00:00').getTime()
             : new Date(r.data.record_time).getTime();
         return getTime(b) - getTime(a);
@@ -146,6 +166,7 @@ export function RecordsPage() {
     if (recordType === 'bp')   return record.type === 'bp';
     if (recordType === 'dose') return record.type === 'dose';
     if (recordType === 'weight') return record.type === 'weight';
+    if (recordType === 'meal') return record.type === 'meal';
     return true;
   });
 
@@ -158,13 +179,16 @@ export function RecordsPage() {
         await deleteBloodPressureRecord(deleteDialog.record.data.id);
       } else if (deleteDialog.record.type === 'dose') {
         await deleteDoseLog(deleteDialog.record.data.id);
-      } else {
+      } else if (deleteDialog.record.type === 'weight') {
         await deleteWeightLog(deleteDialog.record.data.id);
+      } else if (deleteDialog.record.type === 'meal') {
+        await deleteMealLog(deleteDialog.record.data.id);
       }
       setDeleteDialog({ isOpen: false, record: null });
       await loadRecords();
       await loadTodayDose();
       await loadTodayWeight();
+      await loadTodayMeals();
     } catch (error) {
       console.error('删除失败:', error);
       alert('删除失败，请重试');
@@ -198,6 +222,13 @@ export function RecordsPage() {
               onClick={() => navigate(`/records/weight?date=${today}`)}
             >
               + 体重
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/records/meal?date=${today}`)}
+            >
+              + 饮食
             </Button>
           </div>
         </div>
@@ -288,6 +319,39 @@ export function RecordsPage() {
           </div>
         </Card>
 
+        {/* ─── 今日饮食快捷卡片 ─── */}
+        <Card
+          className={`border-2 ${
+            todayMeals.length >= 3 ? 'border-green-300 bg-green-50' :
+            todayMeals.length > 0 ? 'border-blue-300 bg-blue-50' :
+            'border-gray-200 bg-gray-50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500 mb-0.5">今日饮食</p>
+              {todayMeals.length > 0 ? (
+                <div className="flex gap-3 mt-1 flex-wrap">
+                  {todayMeals.map((m) => (
+                    <span key={m.id} className="text-sm text-gray-700">
+                      {MEAL_TYPE_LABELS[m.meal_type].split(' ')[0]} {m.items.length}项
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-base text-gray-500 mt-1">尚未记录今日饮食</p>
+              )}
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(`/records/meal?date=${today}`)}
+            >
+              {todayMeals.length > 0 ? '查看' : '记录'}
+            </Button>
+          </div>
+        </Card>
+
         {/* ─── 时间范围 ─── */}
         <Card>
           <DateRangeSelector
@@ -304,8 +368,8 @@ export function RecordsPage() {
 
         {/* ─── 类型筛选 ─── */}
         <div className="flex rounded-xl overflow-hidden border border-gray-200">
-          {(['all', 'inr', 'bp', 'dose', 'weight'] as RecordType[]).map((type) => {
-            const labels = { all: '全部', inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药', weight: '⚖️ 体重' };
+          {(['all', 'inr', 'bp', 'dose', 'weight', 'meal'] as RecordType[]).map((type) => {
+            const labels = { all: '全部', inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药', weight: '⚖️ 体重', meal: '🥬 饮食' };
             return (
               <button
                 key={type}
@@ -361,12 +425,21 @@ export function RecordsPage() {
                     onDelete={() => setDeleteDialog({ isOpen: true, record })}
                   />
                 );
-              } else {
+              } else if (record.type === 'weight') {
                 return (
                   <WeightRecordCard
                     key={record.data.id}
                     record={record.data}
                     onEdit={() => navigate(`/records/weight?date=${record.data.date}`)}
+                    onDelete={() => setDeleteDialog({ isOpen: true, record })}
+                  />
+                );
+              } else {
+                return (
+                  <MealRecordCard
+                    key={record.data.id}
+                    record={record.data}
+                    onEdit={() => navigate(`/records/meal?date=${record.data.date}`)}
                     onDelete={() => setDeleteDialog({ isOpen: true, record })}
                   />
                 );
@@ -540,6 +613,49 @@ function WeightRecordCard({
           <p className="text-sm text-gray-500 mt-0.5">
             {TIME_OF_DAY_LABELS[record.time_of_day]} · {record.date}
           </p>
+          {record.notes && <p className="text-sm text-gray-500">备注: {record.notes}</p>}
+        </div>
+        <div className="flex flex-col gap-1 ml-3">
+          <Button variant="ghost" size="sm" onClick={onEdit}>编辑</Button>
+          <Button variant="ghost" size="sm" onClick={onDelete} className="text-red-500">删除</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── 饮食记录卡片 ────────────────────────────────────
+function MealRecordCard({
+  record,
+  onEdit,
+  onDelete,
+}: {
+  record: MealLogWithItems;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const highCount = record.items.filter((i) => i.vk_level === 'high').length;
+  const borderColor = highCount >= 2 ? 'border-l-red-400' : highCount >= 1 ? 'border-l-yellow-400' : 'border-l-green-400';
+
+  return (
+    <Card className={`border-l-4 ${borderColor}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-base font-medium text-gray-500 mb-1">
+            🥬 {MEAL_TYPE_LABELS[record.meal_type]}
+          </p>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {record.items.map((item) => {
+              const food = getFoodById(item.food_id);
+              const bgColor = item.vk_level === 'high' ? 'bg-red-100' : item.vk_level === 'medium' ? 'bg-yellow-100' : 'bg-green-100';
+              return (
+                <span key={item.id} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-xs ${bgColor}`}>
+                  {food?.icon || '🍽️'} {item.custom_name || food?.name || item.food_id}
+                </span>
+              );
+            })}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">{record.date}</p>
           {record.notes && <p className="text-sm text-gray-500">备注: {record.notes}</p>}
         </div>
         <div className="flex flex-col gap-1 ml-3">

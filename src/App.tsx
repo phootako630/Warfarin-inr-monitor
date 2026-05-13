@@ -18,6 +18,7 @@ import { ReportPrintPage } from './pages/ReportPrintPage';
 import { DebugPage } from './pages/DebugPage';
 import { DoseFormPage } from './pages/DoseFormPage';
 import { WeightFormPage } from './pages/WeightFormPage';
+import { MealFormPage } from './pages/MealFormPage';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { Loading } from './components/Loading';
 import type { ToastMessage } from './types';
@@ -79,6 +80,9 @@ export function App() {
 
           {/* 新增：体重记录路由 */}
           <Route path="/records/weight" element={<ProtectedRoute isAuthenticated={isAuthenticated}><WeightFormPage /></ProtectedRoute>} />
+
+          {/* 新增：饮食记录路由 */}
+          <Route path="/records/meal" element={<ProtectedRoute isAuthenticated={isAuthenticated}><MealFormPage /></ProtectedRoute>} />
 
           <Route path="/trends" element={<ProtectedRoute isAuthenticated={isAuthenticated}><TrendsPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated}><SettingsPage /></ProtectedRoute>} />

@@ -470,3 +470,146 @@ export async function getLatestWeightLog(): Promise<WeightLog | null> {
   }
   return data;
 }
+
+// ============ 饮食记录 (meal_logs + meal_log_items) ============
+
+import type { MealLog, MealLogItem, MealLogWithItems, MealType } from '../types';
+
+/**
+ * 获取某天所有餐食记录（含食物项）
+ */
+export async function getMealLogsByDate(date: string): Promise<MealLogWithItems[]> {
+  const { data: logs, error } = await supabase
+    .from('meal_logs')
+    .select('*')
+    .eq('date', date)
+    .order('meal_type', { ascending: true });
+
+  if (error) throw new Error(`获取饮食记录失败: ${error.message}`);
+  if (!logs || logs.length === 0) return [];
+
+  const ids = logs.map((l) => l.id);
+  const { data: items, error: itemsErr } = await supabase
+    .from('meal_log_items')
+    .select('*')
+    .in('meal_log_id', ids);
+
+  if (itemsErr) throw new Error(`获取食物项失败: ${itemsErr.message}`);
+
+  const itemMap = new Map<string, MealLogItem[]>();
+  (items || []).forEach((item) => {
+    const arr = itemMap.get(item.meal_log_id) || [];
+    arr.push(item);
+    itemMap.set(item.meal_log_id, arr);
+  });
+
+  return logs.map((log) => ({
+    ...log,
+    items: itemMap.get(log.id) || [],
+  }));
+}
+
+/**
+ * 获取日期范围内的餐食记录（含食物项）
+ */
+export async function getMealLogs(params: {
+  startDate?: Date;
+  endDate?: Date;
+} = {}): Promise<MealLogWithItems[]> {
+  let query = supabase
+    .from('meal_logs')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (params.startDate) query = query.gte('date', params.startDate.toISOString().split('T')[0]);
+  if (params.endDate)   query = query.lte('date', params.endDate.toISOString().split('T')[0]);
+
+  const { data: logs, error } = await query;
+  if (error) throw new Error(`获取饮食记录失败: ${error.message}`);
+  if (!logs || logs.length === 0) return [];
+
+  const ids = logs.map((l) => l.id);
+  const { data: items, error: itemsErr } = await supabase
+    .from('meal_log_items')
+    .select('*')
+    .in('meal_log_id', ids);
+
+  if (itemsErr) throw new Error(`获取食物项失败: ${itemsErr.message}`);
+
+  const itemMap = new Map<string, MealLogItem[]>();
+  (items || []).forEach((item) => {
+    const arr = itemMap.get(item.meal_log_id) || [];
+    arr.push(item);
+    itemMap.set(item.meal_log_id, arr);
+  });
+
+  return logs.map((log) => ({
+    ...log,
+    items: itemMap.get(log.id) || [],
+  }));
+}
+
+/**
+ * 保存一餐记录（upsert meal_log + 全量替换 items）
+ */
+export async function saveMealLog(
+  userId: string,
+  date: string,
+  mealType: MealType,
+  items: Array<{ food_id: string; custom_name?: string; vk_level: string; portion: string }>,
+  notes?: string
+): Promise<MealLogWithItems> {
+  // 1. upsert meal_log
+  const { data: existing } = await supabase
+    .from('meal_logs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('date', date)
+    .eq('meal_type', mealType)
+    .single();
+
+  let logId: string;
+
+  if (existing) {
+    logId = existing.id;
+    await supabase
+      .from('meal_logs')
+      .update({ notes: notes ?? null })
+      .eq('id', logId);
+    // 删除旧 items
+    await supabase.from('meal_log_items').delete().eq('meal_log_id', logId);
+  } else {
+    const { data, error } = await supabase
+      .from('meal_logs')
+      .insert({ user_id: userId, date, meal_type: mealType, notes: notes ?? null })
+      .select()
+      .single();
+    if (error) throw new Error(`创建饮食记录失败: ${error.message}`);
+    logId = data.id;
+  }
+
+  // 2. 插入新 items
+  if (items.length > 0) {
+    const rows = items.map((item) => ({
+      meal_log_id: logId,
+      food_id: item.food_id,
+      custom_name: item.custom_name || null,
+      vk_level: item.vk_level,
+      portion: item.portion,
+    }));
+    const { error: insertErr } = await supabase.from('meal_log_items').insert(rows);
+    if (insertErr) throw new Error(`保存食物项失败: ${insertErr.message}`);
+  }
+
+  // 3. 返回完整记录
+  const result = await getMealLogsByDate(date);
+  return result.find((m) => m.meal_type === mealType)!;
+}
+
+/**
+ * 删除一餐记录（级联删除 items）
+ */
+export async function deleteMealLog(id: string): Promise<void> {
+  const { error } = await supabase.from('meal_logs').delete().eq('id', id);
+  if (error) throw new Error(`删除饮食记录失败: ${error.message}`);
+}

@@ -21,7 +21,7 @@ import { Card } from '../components/Card';
 import { Loading } from '../components/Loading';
 import { EmptyState } from '../components/EmptyState';
 import { DateRangeSelector } from '../components/DateRangeSelector';
-import { getInrRecords, getBloodPressureRecords, getDoseLogs, getDoseRegimes, getWeightLogs } from '../lib/api';
+import { getInrRecords, getBloodPressureRecords, getDoseLogs, getDoseRegimes, getWeightLogs, getMealLogs } from '../lib/api';
 import {
   aggregateInrByDay,
   aggregateBloodPressureByDay,
@@ -32,6 +32,8 @@ import {
   buildDoseChartData,
   aggregateWeightByDay,
   calculateWeightStats,
+  aggregateDailyVk,
+  calculateVkConsistency,
 } from '../lib/aggregate';
 import {
   checkInrRecordHealth,
@@ -45,6 +47,7 @@ import type {
   DoseAdherenceStats,
   DoseChartDataPoint,
   WeightChartDataPoint,
+  DailyVkSummary,
 } from '../types';
 
 // 图表标签：简化日期
@@ -71,11 +74,15 @@ export function TrendsPage() {
   // 新增：剂量相关
   const [doseChartData, setDoseChartData]     = useState<DoseChartDataPoint[]>([]);
   const [adherenceStats, setAdherenceStats]   = useState<DoseAdherenceStats | null>(null);
-  const [activeTab, setActiveTab]             = useState<'inr' | 'bp' | 'dose' | 'weight'>('inr');
+  const [activeTab, setActiveTab]             = useState<'inr' | 'bp' | 'dose' | 'weight' | 'meal'>('inr');
 
   // 新增：体重相关
   const [weightChartData, setWeightChartData] = useState<WeightChartDataPoint[]>([]);
   const [weightStats, setWeightStats]         = useState<any>(null);
+
+  // 新增：饮食相关
+  const [vkSummaries, setVkSummaries]         = useState<DailyVkSummary[]>([]);
+  const [vkConsistency, setVkConsistency]     = useState<any>(null);
 
   useEffect(() => { loadTrends(); }, [timeRange, customStart, customEnd]);
 
@@ -94,12 +101,13 @@ export function TrendsPage() {
     try {
       const dateRange = getDateRange();
 
-      const [inrRecords, bpRecords, doseLogs, regimes, weightLogs] = await Promise.all([
+      const [inrRecords, bpRecords, doseLogs, regimes, weightLogs, mealLogs] = await Promise.all([
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseLogs({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseRegimes(),
         getWeightLogs({ startDate: dateRange.start, endDate: dateRange.end }),
+        getMealLogs({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       setRecentInrRecords(inrRecords);
@@ -126,6 +134,11 @@ export function TrendsPage() {
       setWeightChartData(aggregateWeightByDay(weightLogs));
       setWeightStats(calculateWeightStats(weightLogs));
 
+      // 饮食数据
+      const dailyVk = aggregateDailyVk(mealLogs);
+      setVkSummaries(dailyVk);
+      setVkConsistency(calculateVkConsistency(dailyVk));
+
     } catch (error) {
       console.error('加载趋势失败:', error);
       alert('加载趋势失败，请重试');
@@ -134,7 +147,7 @@ export function TrendsPage() {
     }
   };
 
-  const hasData = inrData.length > 0 || bpData.length > 0 || hrData.length > 0 || doseChartData.length > 0 || weightChartData.length > 0;
+  const hasData = inrData.length > 0 || bpData.length > 0 || hrData.length > 0 || doseChartData.length > 0 || weightChartData.length > 0 || vkSummaries.length > 0;
 
   // ─── 异常警告（原有逻辑）──────────────────────────────────
   const alerts: { type: 'inr' | 'bp'; level: string; messages: string[]; time: string }[] = [];
@@ -185,8 +198,8 @@ export function TrendsPage() {
           <>
             {/* ─── 标签页切换 ─── */}
             <div className="flex rounded-xl overflow-hidden border border-gray-200">
-              {(['inr', 'bp', 'dose', 'weight'] as const).map((tab) => {
-                const labels = { inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药', weight: '⚖️ 体重' };
+              {(['inr', 'bp', 'dose', 'weight', 'meal'] as const).map((tab) => {
+                const labels = { inr: '🩸 INR', bp: '💓 血压', dose: '💊 服药', weight: '⚖️ 体重', meal: '🥬 饮食' };
                 return (
                   <button
                     key={tab}
@@ -421,6 +434,55 @@ export function TrendsPage() {
                         <p className="text-xs text-gray-500 mt-1">期间变化 (kg)</p>
                       </div>
                     </div>
+                  </Card>
+                )}
+              </>
+            )}
+
+            {/* ─── 饮食维K趋势 ─── */}
+            {activeTab === 'meal' && (
+              <>
+                {vkSummaries.length > 0 ? (
+                  <Card>
+                    <h2 className="text-lg font-semibold text-gray-800 mb-1">每日维K摄入</h2>
+                    <p className="text-xs text-gray-400 mb-3">🔴 高VK　🟡 中VK　🟢 低VK</p>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <ComposedChart data={vkSummaries} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tickFormatter={formatDateTick} tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => [value, name]}
+                          labelFormatter={(l) => `日期: ${l}`}
+                        />
+                        <Legend />
+                        <Bar dataKey="highCount" stackId="vk" fill="#ef4444" name="🔴 高VK" />
+                        <Bar dataKey="mediumCount" stackId="vk" fill="#f59e0b" name="🟡 中VK" />
+                        <Bar dataKey="lowCount" stackId="vk" fill="#22c55e" name="🟢 低VK" />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </Card>
+                ) : (
+                  <EmptyState icon="🥬" title="暂无饮食记录" description="开始记录饮食后，这里将显示维K摄入趋势" />
+                )}
+
+                {/* VK 一致性统计 */}
+                {vkConsistency && vkSummaries.length > 0 && (
+                  <Card className={`border-2 ${vkConsistency.isConsistent ? 'border-green-300 bg-green-50' : 'border-yellow-300 bg-yellow-50'}`}>
+                    <h2 className="text-lg font-semibold text-gray-800 mb-3">维K摄入评估</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-gray-800">{vkConsistency.avgLevel}</p>
+                        <p className="text-xs text-gray-500 mt-1">平均摄入水平</p>
+                      </div>
+                      <div className={`rounded-xl p-3 text-center ${vkConsistency.isConsistent ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                        <p className={`text-2xl font-bold ${vkConsistency.isConsistent ? 'text-green-600' : 'text-yellow-600'}`}>
+                          {vkConsistency.isConsistent ? '✅ 稳定' : '⚠️ 波动'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">摄入一致性</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-3">{vkConsistency.message}</p>
                   </Card>
                 )}
               </>

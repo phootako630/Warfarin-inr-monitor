@@ -11,23 +11,29 @@ import {
   getDoseLogs,
   getDoseRegimes,
   getWeightLogs,
+  getMealLogs,
 } from '../lib/api';
 import {
   calculateInrInRangeRate,
   calculateBloodPressureStats,
   calculateDoseAdherenceStats,
   calculateWeightStats,
+  aggregateDailyVk,
+  calculateVkConsistency,
 } from '../lib/aggregate';
-import { DOSE_OPTIONS, TIME_OF_DAY_LABELS } from '../types';
+import { DOSE_OPTIONS, TIME_OF_DAY_LABELS, MEAL_TYPE_LABELS } from '../types';
 import type {
   InrRecord,
   BloodPressureRecord,
   DoseLog,
   DoseRegime,
   WeightLog,
+  MealLogWithItems,
   DoseAdherenceStats,
+  DailyVkSummary,
   TimeRangePreset,
 } from '../types';
+import { getFoodById } from '../lib/foodData';
 
 export function ReportPrintPage() {
   const navigate = useNavigate();
@@ -41,11 +47,13 @@ export function ReportPrintPage() {
   const [doseLogs, setDoseLogs]       = useState<DoseLog[]>([]);
   const [regimes, setRegimes]         = useState<DoseRegime[]>([]);
   const [weightLogs, setWeightLogs]   = useState<WeightLog[]>([]);
+  const [mealLogs, setMealLogs]       = useState<MealLogWithItems[]>([]);
 
   const [inrRate, setInrRate]         = useState(0);
   const [bpStats, setBpStats]         = useState<any>(null);
   const [adherenceStats, setAdherenceStats] = useState<DoseAdherenceStats | null>(null);
   const [wStats, setWStats] = useState<any>(null);
+  const [vkConsistency, setVkConsistency] = useState<any>(null);
 
   useEffect(() => { loadData(); }, [timeRange, customStart, customEnd]);
 
@@ -63,12 +71,13 @@ export function ReportPrintPage() {
     setLoading(true);
     try {
       const dateRange = getDateRange();
-      const [inrData, bpData, doseData, regimeData, weightData] = await Promise.all([
+      const [inrData, bpData, doseData, regimeData, weightData, mealData] = await Promise.all([
         getInrRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getBloodPressureRecords({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseLogs({ startDate: dateRange.start, endDate: dateRange.end }),
         getDoseRegimes(),
         getWeightLogs({ startDate: dateRange.start, endDate: dateRange.end }),
+        getMealLogs({ startDate: dateRange.start, endDate: dateRange.end }),
       ]);
 
       setInrRecords(inrData);
@@ -76,11 +85,15 @@ export function ReportPrintPage() {
       setDoseLogs(doseData);
       setRegimes(regimeData);
       setWeightLogs(weightData);
+      setMealLogs(mealData);
 
       setInrRate(calculateInrInRangeRate(inrData));
       setBpStats(calculateBloodPressureStats(bpData));
       setAdherenceStats(calculateDoseAdherenceStats(doseData, dateRange.start, dateRange.end));
       setWStats(calculateWeightStats(weightData));
+
+      const dailyVk = aggregateDailyVk(mealData);
+      setVkConsistency(calculateVkConsistency(dailyVk));
     } catch (error) {
       console.error('加载数据失败:', error);
       alert('加载数据失败，请重试');
@@ -188,6 +201,15 @@ export function ReportPrintPage() {
                 </p>
               )}
             </div>
+          </div>
+          <div className="border border-gray-200 rounded-lg p-4 print:p-3">
+            <p className="text-sm text-gray-600 mb-2 print:text-xs">饮食记录数</p>
+            <p className="text-2xl font-bold text-gray-900 print:text-xl">{mealLogs.length} 餐</p>
+            {vkConsistency && (
+              <p className="text-sm text-gray-600 mt-2 print:text-xs">
+                维K: {vkConsistency.avgLevel} · {vkConsistency.isConsistent ? '稳定' : '波动'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -335,6 +357,47 @@ export function ReportPrintPage() {
                         <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{log.notes || '—'}</td>
                       </tr>
                     ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ─── 饮食记录摘要 ─── */}
+        {mealLogs.length > 0 && (
+          <div className="mb-8 print:mb-6 print:break-inside-avoid">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 print:text-lg">饮食记录摘要</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">日期</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">餐次</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">食物</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold print:text-xs print:px-2 print:py-1">维K</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...mealLogs]
+                    .sort((a, b) => a.date.localeCompare(b.date) || a.meal_type.localeCompare(b.meal_type))
+                    .map((log) => {
+                      const highItems = log.items.filter((i) => i.vk_level === 'high');
+                      return (
+                        <tr key={log.id}>
+                          <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{log.date}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">{MEAL_TYPE_LABELS[log.meal_type]}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">
+                            {log.items.map((item) => {
+                              const food = getFoodById(item.food_id);
+                              return item.custom_name || food?.name || item.food_id;
+                            }).join('、')}
+                          </td>
+                          <td className="border border-gray-300 px-3 py-2 text-sm print:text-xs print:px-2 print:py-1">
+                            {highItems.length > 0 ? `🔴 高(${highItems.length})` : '🟢 正常'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
