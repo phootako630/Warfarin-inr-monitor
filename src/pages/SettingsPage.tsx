@@ -6,7 +6,22 @@ import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Loading } from '../components/Loading';
 import { getCurrentUser, signOut } from '../lib/auth';
-import { getProfile } from '../lib/api';
+import {
+  getProfile,
+  getInrRecords,
+  getBloodPressureRecords,
+  getDoseLogs,
+  getWeightLogs,
+  getMealLogs,
+} from '../lib/api';
+import {
+  exportInrRecords,
+  exportBpRecords,
+  exportDoseLogs,
+  exportWeightLogs,
+  exportMealLogs,
+  exportAllRecords,
+} from '../lib/export';
 import type { Profile } from '../types';
 
 export function SettingsPage() {
@@ -15,6 +30,7 @@ export function SettingsPage() {
   const [email, setEmail] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
     loadUserData();
@@ -32,6 +48,47 @@ export function SettingsPage() {
       console.error('加载用户数据失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async (type: 'inr' | 'bp' | 'dose' | 'weight' | 'meal' | 'all') => {
+    setExporting(type);
+    try {
+      if (type === 'all') {
+        const [inr, bp, dose, weight, meals] = await Promise.all([
+          getInrRecords({}),
+          getBloodPressureRecords({}),
+          getDoseLogs({}),
+          getWeightLogs({}),
+          getMealLogs({}),
+        ]);
+        exportAllRecords(inr, bp, dose, weight, meals);
+      } else if (type === 'inr') {
+        const data = await getInrRecords({});
+        if (data.length === 0) { alert('没有INR记录可导出'); return; }
+        exportInrRecords(data);
+      } else if (type === 'bp') {
+        const data = await getBloodPressureRecords({});
+        if (data.length === 0) { alert('没有血压记录可导出'); return; }
+        exportBpRecords(data);
+      } else if (type === 'dose') {
+        const data = await getDoseLogs({});
+        if (data.length === 0) { alert('没有服药记录可导出'); return; }
+        exportDoseLogs(data);
+      } else if (type === 'weight') {
+        const data = await getWeightLogs({});
+        if (data.length === 0) { alert('没有体重记录可导出'); return; }
+        exportWeightLogs(data);
+      } else if (type === 'meal') {
+        const data = await getMealLogs({});
+        if (data.length === 0) { alert('没有饮食记录可导出'); return; }
+        exportMealLogs(data);
+      }
+    } catch (err) {
+      console.error('导出失败:', err);
+      alert('导出失败，请重试');
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -86,11 +143,74 @@ export function SettingsPage() {
 
         <Card>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            📤 导出数据
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">导出为 CSV 文件（可用 Excel 打开）</p>
+
+          <div className="space-y-2">
+            <Button
+              variant="primary"
+              fullWidth
+              size="lg"
+              onClick={() => handleExport('all')}
+              disabled={!!exporting}
+            >
+              {exporting === 'all' ? '导出中...' : '📦 导出全部数据'}
+            </Button>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleExport('inr')}
+                disabled={!!exporting}
+              >
+                {exporting === 'inr' ? '...' : '🩸 INR'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleExport('bp')}
+                disabled={!!exporting}
+              >
+                {exporting === 'bp' ? '...' : '💓 血压'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleExport('dose')}
+                disabled={!!exporting}
+              >
+                {exporting === 'dose' ? '...' : '💊 服药'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleExport('weight')}
+                disabled={!!exporting}
+              >
+                {exporting === 'weight' ? '...' : '⚖️ 体重'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleExport('meal')}
+                disabled={!!exporting}
+                className="col-span-2"
+              >
+                {exporting === 'meal' ? '...' : '🥬 饮食'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
             关于应用
           </h2>
           <div className="space-y-2 text-base text-gray-600">
-            <p>版本: 1.0.0</p>
-            <p>用于记录与查看 INR、血压、心率数据</p>
+            <p>版本: 1.1.0</p>
+            <p>华法林剂量管理 — INR、血压、服药、体重、饮食记录</p>
           </div>
         </Card>
 
